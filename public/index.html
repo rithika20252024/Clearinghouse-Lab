@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clearinghouse Lab</title>
+<style>
+:root { color-scheme: dark; font: 16px system-ui; background: #121819; color: #eef5ef; }
+body { max-width: 65rem; margin: 3rem auto; padding: 0 1rem; }
+h1 { font-size: clamp(2rem, 6vw, 4rem); margin: .15em 0; letter-spacing: -.06em; }
+h2 { font-size: 1.18rem; margin-top: 0; }
+p { color: #bdcbc5; }
+small { color: #a8e4bb; }
+main { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); gap: 1rem; margin-top: 2rem; }
+section { border: 1px solid #3c4a45; border-radius: 1rem; background: #1b2523; padding: 1.25rem; min-width: 0; }
+label { display: block; margin: .75rem 0; }
+input, select, textarea, button { font: inherit; padding: .5rem; border: 1px solid #5d7469; border-radius: .4rem; }
+input, select, textarea { background: #121819; color: inherit; }
+textarea { box-sizing: border-box; width: 100%; }
+button { cursor: pointer; background: #b4eabf; color: #112318; margin: .2rem .2rem .2rem 0; }
+button:disabled { opacity: .5; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; }
+#payments button { display: block; background: #263930; color: #eef5ef; }
+</style>
+</head>
+<body>
+<small>LOCAL PAYMENTS ENGINEERING LAB</small>
+<h1>Clearinghouse</h1>
+<p>Start a payment, replay its capture, then compare the ledger with a separate provider report.</p>
+<p role="status" id="status"></p>
+<main>
+<section>
+<h2>01 · Payment</h2>
+<form id="create">
+<label>USD cents <input name="amount" type="number" min="100" max="100000" value="2500" required></label>
+<label>Provider <select name="provider"><option value="demo">Local simulator</option><option value="stripe" disabled>Stripe test mode</option></select></label>
+<button type="submit">Create payment</button>
+<button type="button" id="new-key">New request key</button>
+</form>
+<small id="request-key"></small>
+<pre id="payment"></pre>
+<button id="capture" disabled>Deliver / replay demo capture</button>
+</section>
+<section>
+<h2>02 · Ledger</h2>
+<button id="refresh">Refresh recent payments</button>
+<div id="payments"></div>
+<pre id="ledger"></pre>
+</section>
+<section>
+<h2>03 · Reconciliation</h2>
+<form id="reconcile">
+<label>Report provider <select name="provider"><option>demo</option><option>stripe</option></select></label>
+<label>Provider capture rows (JSON)
+<textarea name="rows" rows="6" required>[{"ref":"demo_missing","amount":2500,"currency":"usd"}]</textarea></label>
+<button type="submit">Compare report</button>
+</form>
+<pre id="report"></pre>
+</section>
+</main>
+<script type="module">
+const byId = id => document.getElementById(id);
+let key;
+let selected;
+function newKey() {
+  key = crypto.randomUUID();
+  byId('request-key').textContent = 'Request key: ' + key;
+}
+newKey();
+
+async function api(path, data, headers = {}) {
+  const response = await fetch(path, data === undefined ? {} : {
+    method: 'POST', headers: {'Content-Type': 'application/json', ...headers}, body: JSON.stringify(data)
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error);
+  return payload;
+}
+function show(id, value) {
+  byId(id).textContent = JSON.stringify(value, null, 2);
+}
+async function loadPayment(id) {
+  const detail = await api('/api/payments/' + id);
+  selected = detail.payment;
+  show('payment', selected);
+  show('ledger', detail.entries);
+  byId('capture').disabled = selected.provider !== 'demo';
+}
+async function refresh() {
+  const payments = await api('/api/payments');
+  byId('payments').replaceChildren(...payments.map(row => {
+    const button = document.createElement('button');
+    button.textContent = row.id.slice(0, 8) + ' · ' + row.provider + ' · ' + row.status + ' · $' + (row.amount / 100).toFixed(2);
+    button.title = row.provider_ref ?? row.id;
+    button.onclick = handle(() => loadPayment(row.id));
+    return button;
+  }));
+}
+function handle(work) {
+  return async event => {
+    event?.preventDefault();
+    byId('status').textContent = '';
+    try { await work(event); }
+    catch (error) { byId('status').textContent = error.message; }
+  };
+}
+byId('create').onsubmit = handle(async event => {
+  const { amount, provider } = event.currentTarget.elements;
+  const result = await api('/api/payments', { amount: Number(amount.value), provider: provider.value }, {'Idempotency-Key': key});
+  if (result.checkoutUrl) return location.assign(result.checkoutUrl);
+  await loadPayment(result.payment.id);
+  await refresh();
+});
+byId('capture').onclick = handle(async () => {
+  const id = selected.id;
+  const result = await api('/api/demo/capture', {id});
+  byId('status').textContent = result.duplicate ? 'Replay acknowledged. The ledger still contains one posting.' : 'Capture posted.';
+  await loadPayment(id);
+  await refresh();
+});
+byId('new-key').onclick = newKey;
+byId('refresh').onclick = handle(async () => {
+  await refresh();
+  if (selected) await loadPayment(selected.id);
+});
+byId('reconcile').onsubmit = handle(async event => {
+  const { provider, rows } = event.currentTarget.elements;
+  show('report', await api('/api/reconciliation', {provider: provider.value, rows: JSON.parse(rows.value)}));
+});
+await handle(async () => {
+  byId('create').elements.provider.options[1].disabled = !(await api('/api/config')).stripe;
+  await refresh();
+  const id = new URLSearchParams(location.search).get('payment');
+  if (id) await loadPayment(id);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+{
+  "environment": {
+    "node": "v24.13.1",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M4",
+    "storage": "SQLite WAL on local disk",
+    "transport": "loopback HTTP, simulated provider"
+  },
+  "warmupPayments": 100,
+  "results": [
+    {
+      "concurrency": 1,
+      "payments": 3000,
+      "errors": 0,
+      "requestsPerSecond": 3949.3,
+      "latencyMs": {
+        "create": {
+          "samples": 3000,
+          "p50": 0.22,
+          "p95": 0.39,
+          "p99": 1.1
+        },
+        "capture": {
+          "samples": 3000,
+          "p50": 0.26,
+          "p95": 0.45,
+          "p99": 0.89
+        },
+        "replay": {
+          "samples": 3000,
+          "p50": 0.15,
+          "p95": 0.28,
+          "p99": 0.45
+        },
+        "lifecycle": {
+          "samples": 3000,
+          "p50": 0.64,
+          "p95": 1.2,
+          "p99": 2.44
+        }
+      }
+    },
+    {
+      "concurrency": 16,
+      "payments": 3000,
+      "errors": 0,
+      "requestsPerSecond": 4385.3,
+      "latencyMs": {
+        "create": {
+          "samples": 3000,
+          "p50": 3.12,
+          "p95": 6.07,
+          "p99": 10.71
+        },
+        "capture": {
+          "samples": 3000,
+          "p50": 3.07,
+          "p95": 6.01,
+          "p99": 10.68
+        },
+        "replay": {
+          "samples": 3000,
+          "p50": 3.2,
+          "p95": 6.07,
+          "p99": 10.85
+        },
+        "lifecycle": {
+          "samples": 3000,
+          "p50": 9.63,
+          "p95": 17.19,
+          "p99": 21.39
+        }
+      }
+    },
+    {
+      "concurrency": 64,
+      "payments": 3000,
+      "errors": 0,
+      "requestsPerSecond": 4473,
+      "latencyMs": {
+        "create": {
+          "samples": 3000,
+          "p50": 12.55,
+          "p95": 21.15,
+          "p99": 31.14
+        },
+        "capture": {
+          "samples": 3000,
+          "p50": 12.49,
+          "p95": 20.84,
+          "p99": 30.59
+        },
+        "replay": {
+          "samples": 3000,
+          "p50": 12.56,
+          "p95": 20.76,
+          "p99": 24.44
+        },
+        "lifecycle": {
+          "samples": 3000,
+          "p50": 40.33,
+          "p95": 56.23,
+          "p99": 97
+        }
+      }
+    }
+  ],
+  "accounting": {
+    "captured": 9100,
+    "events": 9100,
+    "ledger_legs": 18200,
+    "net_cents": 0
+  }
+}
